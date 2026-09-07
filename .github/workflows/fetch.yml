@@ -1,7 +1,7 @@
 name: fetch-assets
 on:
   push:
-    paths: ['manifest.txt']
+    paths: ['manifest*.txt']
   workflow_dispatch:
 permissions:
   contents: write
@@ -16,13 +16,15 @@ jobs:
           mkdir -p assets
           B="https://storage.googleapis.com/xi-backend/database/workspace/bc3ff325105145d58fff9ca71549d830/content_generation"
           CRED="X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=xi-backend-prod%40xi-labs.iam.gserviceaccount.com%2F20260907%2Fauto%2Fstorage%2Fgoog4_request"
+          cat manifest*.txt > /tmp/all.txt
           while read -r name ext sess gen date sig; do
             [ -z "$name" ] && continue
+            [ -s "assets/$name.$ext" ] && continue
             url="$B/$sess/$gen/content.$ext?$CRED&X-Goog-Date=$date&X-Goog-Expires=7200&X-Goog-SignedHeaders=host&X-Goog-Signature=$sig"
-            code=$(curl -sS -o "assets/$name.$ext" -w "%{http_code}" --max-time 60 "$url")
+            code=$(curl -sS -o "assets/$name.$ext" -w "%{http_code}" --max-time 120 "$url")
             echo "$name.$ext $code $(stat -c%s assets/$name.$ext)"
             [ "$code" = "200" ] || exit 1
-          done < manifest.txt
+          done < /tmp/all.txt
       - name: Commit
         run: |
           git config user.name github-actions
