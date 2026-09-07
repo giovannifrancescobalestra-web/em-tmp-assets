@@ -1,0 +1,32 @@
+name: fetch-assets
+on:
+  push:
+    paths: ['manifest.txt']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download signed assets
+        run: |
+          set -e
+          mkdir -p assets
+          B="https://storage.googleapis.com/xi-backend/database/workspace/bc3ff325105145d58fff9ca71549d830/content_generation"
+          CRED="X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=xi-backend-prod%40xi-labs.iam.gserviceaccount.com%2F20260907%2Fauto%2Fstorage%2Fgoog4_request"
+          while read -r name ext sess gen date sig; do
+            [ -z "$name" ] && continue
+            url="$B/$sess/$gen/content.$ext?$CRED&X-Goog-Date=$date&X-Goog-Expires=7200&X-Goog-SignedHeaders=host&X-Goog-Signature=$sig"
+            code=$(curl -sS -o "assets/$name.$ext" -w "%{http_code}" --max-time 60 "$url")
+            echo "$name.$ext $code $(stat -c%s assets/$name.$ext)"
+            [ "$code" = "200" ] || exit 1
+          done < manifest.txt
+      - name: Commit
+        run: |
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add assets
+          git commit -m "assets $(date -u +%H%M%S)" || echo nothing
+          git push
