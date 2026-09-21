@@ -1,0 +1,21 @@
+name: relay
+on:
+  push:
+    paths: ['relay/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m pip install --quiet pillow
+      - run: bash relay/run.sh
+      - run: |
+          git config user.name github-actions
+          git config user.email actions@github.com
+          git add relay_out
+          git commit -m "relay $(date -u +%H%M%S)" || echo nothing
+          git pull --rebase
+          git push
